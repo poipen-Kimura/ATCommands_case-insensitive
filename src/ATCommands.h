@@ -88,7 +88,8 @@ private:
 
     // input validation
     static int isValidCmdChar(const char c);
-    static uint8_t ATCommands::hexToChar(const char ch);
+    // edited by guoxinghua
+    static uint8_t hexToChar(const char ch);
 
     // registers command array
     bool registerCommands(const at_command_t *commands, uint32_t size);

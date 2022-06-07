@@ -18,14 +18,18 @@ ATCommands::ATCommands()
 {
 }
 
-void ATCommands::begin(Stream *stream, const at_command_t *commands, uint32_t size, const uint16_t bufferSize, const char *terminator = "\r\n")
+void ATCommands::begin(Stream *stream, const at_command_t *commands, uint32_t size, const uint16_t bufferSize, const char *terminator)
 {
     this->serial = stream;
+    //结束符
     this->term = terminator;
+    //保留空间
     this->bufferString.reserve(bufferSize);
+    //缓冲区大小
     this->bufferSize = bufferSize;
-
+    //注册指令，指令结构体大小（用来计算结构体数组数量）
     registerCommands(commands, size);
+    //初始化缓存
     clearBuffer();
 }
 
@@ -38,15 +42,17 @@ void ATCommands::begin(Stream *stream, const at_command_t *commands, uint32_t si
  * is compared against the delcared array (atCommands) to find a matching
  * command name.  If a match is found the function is passed to the handler
  * for later execution.
- * @return true 
- * @return false 
+ * @return true
+ * @return false
  */
 bool ATCommands::parseCommand()
 {
+    // AT+ 0,1,2 从+开始,指令按"+CMD"进行识别，而不是"CMD"，所以从2开始，支持“CMD格式指令”
     uint16_t pos = 2;
     uint8_t type;
 
     // validate input so that we act only when we have to
+    // 比如仅收到了一个EOL和结束符，则bufferPos==0,此种情况不进行处理
     if (this->bufferPos == 0)
     {
         // fall through
@@ -54,11 +60,13 @@ bool ATCommands::parseCommand()
         return true;
     }
 
+    //没有以AT开头,则丢弃改指令
     if (!this->bufferString.startsWith("AT"))
     {
         return false;
     }
 
+    // i 是当前要进行指令类型判断的字符索引，pos是当前要提取的指令字符串的索引，跳出后两者不一致 pos=i+1
     for (uint16_t i = 2; i < this->bufferSize; i++)
     {
         // if we reach the null terminator and have not yet reached a state then we
@@ -66,15 +74,20 @@ bool ATCommands::parseCommand()
         if (this->bufferString[i] == '\0')
         {
             type = AT_COMMAND_RUN;
+            //跳出循环
             break;
         }
 
+        // 合法字符判定，若含非法字符则返回false
         // eliminate shenanigans
         if (isValidCmdChar(this->bufferString[i]) == 0)
         {
             return false;
         }
 
+        // 如果包含=，则认为WRITE指令
+        // 如果包含=? 则是TEST指令
+        // 如果包含? 则认为是READ指令
         // determine command type
         if (this->bufferString[i] == '=')
         {
@@ -98,8 +111,11 @@ bool ATCommands::parseCommand()
 
         pos++;
     }
+    //指令全部内容
     this->command = this->bufferString.substring(2, pos);
+    //指令类型
     this->AT_COMMAND_TYPE = type;
+    //当前指令在所有指令数组中的索引
     int8_t cmdNumber = -1;
 
     // search for matching command in array
@@ -119,6 +135,7 @@ bool ATCommands::parseCommand()
         return false;
     }
 
+    // 根据不同的类型将Handler指针赋值给处理器
     // handle the different commands
     switch (type)
     {
@@ -132,6 +149,7 @@ bool ATCommands::parseCommand()
         setDefaultHandler(this->atCommands[cmdNumber].at_testCmd);
         goto process;
     case AT_COMMAND_WRITE:
+        // TODO:需要判定什么时候返回false
         if (parseParameters(pos))
         {
             setDefaultHandler(this->atCommands[cmdNumber].at_writeCmd);
@@ -153,9 +171,9 @@ bool ATCommands::parseCommand()
  * usually supplied in WRITE (eg AT+COMMAND=param1,param2) commands.  It makes
  * use of malloc so check above in parseCommand where we free it to keep things
  * neat.
- * @param pos 
- * @return true 
- * @return false 
+ * @param pos
+ * @return true
+ * @return false
  */
 bool ATCommands::parseParameters(uint16_t pos)
 {
@@ -183,7 +201,7 @@ boolean ATCommands::hasNext()
  * Returns NULL when there is nothing more.  Subsequent calls pretty much ensure
  * this goes in a loop but it is expected the user knows their own parameters so there
  * would be no need to exceed boundaries.
- * @return char* 
+ * @return char*
  */
 String ATCommands::next()
 {
@@ -198,15 +216,19 @@ String ATCommands::next()
     String result = "";
     int delimiterIndex = this->bufferString.indexOf(",", tokenPos);
 
+    //如果未找到,分隔符,则表示是最后一个参数，取全部
     if (delimiterIndex == -1)
     {
         result = this->bufferString.substring(tokenPos);
+        //下一个token的位置在末尾
         tokenPos = this->bufferSize;
         return result;
     }
     else
     {
+        //取到分隔符的位置的前一个字符，tokenPos到 delimiterIndex-1 的字符
         result = this->bufferString.substring(tokenPos, delimiterIndex);
+        //下一个参数的开始是分隔符的后一个字符
         tokenPos = delimiterIndex + 1;
         return result;
     }
@@ -216,14 +238,15 @@ String ATCommands::next()
  * @brief update
  * Main function called by the loop.  Reads in available charactrers and writes
  * to the buffer.  When the line terminator is found continues to parse and eventually
- * process the command.
- * @return AT_COMMANDS_ERRORS 
+ * process the command.依靠判定终止符位置，将一个完整的指令写入缓存，并调用parseCommand进行解析
+ * @return AT_COMMANDS_ERRORS
  */
 AT_COMMANDS_ERRORS ATCommands::update()
 {
+    AT_COMMANDS_ERRORS ret;
     if (serial == NULL)
     {
-        return AT_COMMANDS_ERROR_NO_SERIAL;
+        return AT_COMMANDS_ERRORS::AT_COMMANDS_ERROR_NO_SERIAL;
     }
 
     while (serial->available() > 0)
@@ -250,30 +273,37 @@ AT_COMMANDS_ERRORS ATCommands::update()
         }
         Serial.println();
 #endif
+        // 0意味字符串结束 ，<0 无意义？
         if (ch <= 0)
         {
             continue;
         }
 
+        //缓冲区未满则继续写入，不写入终止符"\r\n"
         if (bufferPos < this->bufferSize)
         {
             writeToBuffer(ch);
         }
+        //缓冲区已满则不再继续写入，每次收到的数据不能比缓冲区对，否则爆粗
         else
         {
 #ifdef AT_COMMANDS_DEBUG
             Serial.println(F("--BUFFER OVERFLOW--"));
 #endif
             clearBuffer();
-            return AT_COMMANDS_ERROR_BUFFER_FULL;
+            return AT_COMMANDS_ERRORS::AT_COMMANDS_ERROR_BUFFER_FULL;
         }
 
+        // 未到达终止符，则继续读取下一个字符
         if (term[termPos] != ch)
         {
             termPos = 0;
             continue;
         }
 
+        // 这里很巧妙
+        // term[++termPos] == 0 ，表示没有下一个终止符，则终止符判定完成，进入指令解析过程
+        // term[++termPos] != 0 ，表示有下一个终止符，++termPos，则跳过解析，继续下一次读取进行判定
         if (term[++termPos] == 0)
         {
 
@@ -286,11 +316,13 @@ AT_COMMANDS_ERRORS ATCommands::update()
             Serial.println(F("]"));
 #endif
 
+            //进行指令解析
             if (!parseCommand())
             {
                 this->error();
                 clearBuffer();
-                return;
+                // added by guoxinghua
+                return AT_COMMANDS_ERRORS::AT_COMMANDS_ERROR_SYNTAX;
             }
 
             // process the command
@@ -300,12 +332,14 @@ AT_COMMANDS_ERRORS ATCommands::update()
             clearBuffer();
         }
     }
+    // add by guoxinghua
+    return AT_COMMANDS_ERRORS::AT_COMMANDS_SUCCESS;
 }
 
 /**
  * @brief writeToBuffer
  * writes the input to the buffer excluding line terminators
- * @param data 
+ * @param data
  */
 void ATCommands::writeToBuffer(int data)
 {
@@ -320,7 +354,7 @@ void ATCommands::writeToBuffer(int data)
 /**
  * @brief setDefaultHandler
  * Sets the function handler (callback) on the user's side.
- * @param function 
+ * @param function
  */
 void ATCommands::setDefaultHandler(bool (*function)(ATCommands *))
 {
@@ -347,15 +381,17 @@ void ATCommands::processCommand()
 /**
  * @brief registerCommands
  * Registers the user-supplied command array for use later in parseCommand
- * @param commands 
- * @param size 
- * @return true 
- * @return false 
+ * @param commands
+ * @param size
+ * @return true
+ * @return false
  */
 bool ATCommands::registerCommands(const at_command_t *commands, uint32_t size)
 {
     atCommands = commands;
     numberOfCommands = (uint16_t)(size / sizeof(at_command_t));
+    // added by guoxinghua
+    return true;
 }
 
 /**
@@ -364,17 +400,20 @@ bool ATCommands::registerCommands(const at_command_t *commands, uint32_t size)
  */
 void ATCommands::clearBuffer()
 {
-    //for (uint16_t i = 0; i < this->buffer->size; i++)
+    // for (uint16_t i = 0; i < this->buffer->size; i++)
     this->bufferString = "";
+    //？？？
     termPos = 0;
+    //缓冲区位置
     bufferPos = 0;
+    //参数开始位置
     tokenPos = 0;
 }
 
 /**
  * @brief ok
  * prints OK to terminal
- * 
+ *
  */
 void ATCommands::ok()
 {
@@ -384,7 +423,7 @@ void ATCommands::ok()
 /**
  * @brief error
  * prints ERROR to terminal
- * 
+ *
  */
 void ATCommands::error()
 {
@@ -394,8 +433,8 @@ void ATCommands::error()
 /**
  * @brief isValidCmdChar
  * Hackish attempt at validating input commands
- * @param ch 
- * @return int 
+ * @param ch
+ * @return int
  */
 int ATCommands::isValidCmdChar(const char ch)
 {

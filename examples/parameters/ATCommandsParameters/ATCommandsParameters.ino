@@ -63,9 +63,12 @@ bool at_test_cmd_print(ATCommands *sender)
  * information needs to be recorded (such as variables being set etc).  The sender object
  * will provide the list of parameters.
  * not requiring parameters.
- * @param sender 
- * @return true 
- * @return false 
+ * AT+PRINT={"hello":"123"\,"hi":434},ABC
+ * AT+PRINT=?
+ * AT+PRINT
+ * @param sender
+ * @return true
+ * @return false
  */
 bool at_write_cmd_print(ATCommands *sender)
 {

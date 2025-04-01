@@ -1,3 +1,13 @@
+# Fork Description
+Added a case-insensitive mode for input characters when invoking AT commands.
+```c++
+    AT.begin(&Serial, commands, sizeof(commands), WORKING_BUFFER_SIZE, terminator, caseSensitive);
+```
+ **caseSensitive**: bool (default = false)
+
+->>>>> Below is the original README.
+----
+
 # ATCommands
 This is an Arduino library for folks who love the simplicity of AT-style commands.
 

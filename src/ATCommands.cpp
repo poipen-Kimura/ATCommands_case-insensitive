@@ -18,8 +18,9 @@ ATCommands::ATCommands()
 {
 }
 
-void ATCommands::begin(Stream *stream, const at_command_t *commands, uint32_t size, const uint16_t bufferSize, const char *terminator)
+void ATCommands::begin(Stream *stream, const at_command_t *commands, uint32_t size, const uint16_t bufferSize, const char *terminator, bool caseSensitive)
 {
+    this->caseSensitive = caseSensitive;
     this->serial = stream;
     //结束符
     this->term = terminator;
@@ -61,7 +62,13 @@ bool ATCommands::parseCommand()
     }
 
     //没有以AT开头,则丢弃改指令
-    if (!this->bufferString.startsWith("AT"))
+    String cmdHead = this->bufferString.substring(0, 2);
+    if (!this->caseSensitive)
+    {
+        cmdHead.toUpperCase();
+    }
+
+    if (cmdHead != "AT")
     {
         return false;
     }
@@ -121,7 +128,8 @@ bool ATCommands::parseCommand()
     // search for matching command in array
     for (uint8_t i = 0; i < this->numberOfCommands; i++)
     {
-        if (command.equals(atCommands[i].at_cmdName))
+        if (command.equals(atCommands[i].at_cmdName) ||
+            (!this->caseSensitive && command.equalsIgnoreCase(atCommands[i].at_cmdName)))
         {
             cmdNumber = i;
             break;
@@ -438,5 +446,6 @@ void ATCommands::error()
  */
 int ATCommands::isValidCmdChar(const char ch)
 {
-    return (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || (ch == '+') || (ch == '#') || (ch == '$') || (ch == '@') || (ch == '_') || (ch == '=') || (ch == '?');
+    // return (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || (ch == '+') || (ch == '#') || (ch == '$') || (ch == '@') || (ch == '_') || (ch == '=') || (ch == '?');
+    return (ch >= 0x20 && ch <= 0x7E);
 }

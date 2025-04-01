@@ -94,6 +94,9 @@ private:
     // registers command array
     bool registerCommands(const at_command_t *commands, uint32_t size);
 
+    // Case sensitive flag for command names
+    bool caseSensitive = false;
+
     // command parsing
     uint8_t AT_COMMAND_TYPE; // the type of command (see enum declaration)
     //char *params;            // command parameters in the case of a WRITE
@@ -114,7 +117,7 @@ public:
     ATCommands();
 
     // register serial port, commands and buffers
-    void begin(Stream *serial, const at_command_t *commands, uint32_t size, const uint16_t bufferSize, const char *terminator = "\r\n");
+    void begin(Stream *serial, const at_command_t *commands, uint32_t size, const uint16_t bufferSize, const char *terminator = "\r\n", bool caseSensitive = false);
 
     // command parsing
     String command; // the command (eg: +TEST in AT+TEST)

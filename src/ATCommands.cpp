@@ -14,7 +14,7 @@
 */
 #include "ATCommands.h"
 
-ATCommands::ATCommands()
+ATCommands::ATCommands():errorHandler(NULL)
 {
 }
 
@@ -139,6 +139,12 @@ bool ATCommands::parseCommand()
     // if we did not find a match there's no point in continuing
     if (cmdNumber == -1)
     {
+        if (errorHandler != NULL)
+        {
+            (*errorHandler)(this);
+            this->cancelErrorMsg = true;
+        }
+
         clearBuffer();
         return false;
     }
@@ -370,6 +376,16 @@ void ATCommands::setDefaultHandler(bool (*function)(ATCommands *))
 }
 
 /**
+ * @brief setErrorHandler
+ * Set the user-side function handler (callback) to be called in case of a command error.
+ * @param function
+ */
+void ATCommands::setErrorHandler(void (*function)(ATCommands *))
+{
+    this->errorHandler = function;
+}
+
+/**
  * @brief processCommand
  * Invokes the defined handler to process (callback) the command on the user's side.
  */
@@ -419,6 +435,16 @@ void ATCommands::clearBuffer()
 }
 
 /**
+ * @brief getBuffer
+ * returns the buffer string
+ * @return String
+ */
+String ATCommands::getBuffer()
+{
+    return this->bufferString;
+}
+
+/**
  * @brief ok
  * prints OK to terminal
  *
@@ -435,6 +461,11 @@ void ATCommands::ok()
  */
 void ATCommands::error()
 {
+    if (this->cancelErrorMsg)
+    {
+        this->cancelErrorMsg = false;
+        return;
+    }    
     this->serial->println("ERROR");
 }
 

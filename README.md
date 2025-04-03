@@ -1,9 +1,29 @@
 # Fork Description
-Added a case-insensitive mode for input characters when invoking AT commands.
+## Added a case-insensitive mode for input characters when invoking AT commands.
+Added the **caseSensitive** flag to the begin method argument.
 ```c++
-    AT.begin(&Serial, commands, sizeof(commands), WORKING_BUFFER_SIZE, terminator, caseSensitive);
+AT.begin(&Serial, commands, sizeof(commands), WORKING_BUFFER_SIZE, terminator, caseSensitive);
 ```
  **caseSensitive**: bool (default = false)
+ ## Added handling function for command errors.
+ Use this when you want to do something with an input buffer that has been determined to be in error.
+```c++
+// Define error string handling functions.
+void at_cmd_error(ATCommands *sender)
+{
+    String bufer = sender->getBuffer();
+    /*
+    Do something with buffer strings.
+        e.g. Serial.println(buffer);
+    You could simply turn on an LED or something.
+    */
+    return;
+}
+
+//------------------------------------------
+ATCommands atcmd;
+atcmd.setErrorHandler(at_cmd_error);
+```
 
 ->>>>> Below is the original README.
 ----

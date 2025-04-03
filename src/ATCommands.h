@@ -97,6 +97,9 @@ private:
     // Case sensitive flag for command names
     bool caseSensitive = false;
 
+     // cancel error message
+    bool cancelErrorMsg = false;
+
     // command parsing
     uint8_t AT_COMMAND_TYPE; // the type of command (see enum declaration)
     //char *params;            // command parameters in the case of a WRITE
@@ -108,6 +111,7 @@ private:
 
     // callbacks
     bool (*defaultHandler)(ATCommands *);
+    void (*errorHandler)(ATCommands *);
     void setDefaultHandler(bool (*function)(ATCommands *));
 
 public:
@@ -150,6 +154,8 @@ public:
 
     void ok();
     void error();
+    void setErrorHandler(void (*function)(ATCommands *));
+    String getBuffer();
 };
 
 #endif
